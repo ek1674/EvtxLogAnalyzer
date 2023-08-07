@@ -4,7 +4,8 @@
 import openai
 
 #Sets the API key
-openai.api_key = "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"
+#Replace the "ENTER KEY HERE" with your OpenAI key
+openai.api_key = "ENTER KEY HERE"
 
 # Sets the chat engine model to be used
 model_engine = "text-davinci-003"
