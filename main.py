@@ -1,19 +1,148 @@
-#  This build of my software splits the GUI into three tabs a Info tab, Contents tab, and finally analysis tab
-#  It is important to note that AI, nor sorting, has yet been implemented
+#  This is a beta LLM for NLP, needs to be trained on a custom database THIS SECTION NEEDS TO BE UPDATED
+#  Time spent on this == 37 hours
+
+# Import necessary libraries
+import spacy  # Imports the spaCy library, used for natural language processing (NLP).
+#import spacy_transformers
+from spacy_transformers import TransformersLanguage, TransformersWordPiecer, \
+    TransformersTok2Vec  # Imports specific components from the spacy_transformers library.
+import tensorflow as tf  # Imports the TensorFlow library for machine learning and deep learning.
+import requests  # Imports the requests library for making HTTP requests.
+from bs4 import BeautifulSoup  # Imports BeautifulSoup from the bs4 library for web scraping.
+from urllib.parse import urlparse, \
+    urljoin  # Imports specific functions from the urllib.parse library for working with URLs.
+from transformers import AutoTokenizer, \
+    RobertaModel  # Imports specific components from the transformers library for working with pre-trained models.
+import nltk  # Imports the nltk library for natural language processing tasks.
+import re  # Imports the re library for regular expressions.
+#import sys  # Imports the sys library for system-related operations.
+import tkinter as tk  # Imports the tkinter library for creating a graphical user interface (GUI).
+from tkinter import filedialog  # Imports the filedialog submodule from tkinter for file selection dialogs.
+from tkinter import ttk  # Imports the ttk submodule from tkinter for themed widgets.
+import evtx  # Imports the Evtx module from the Evtx library for working with Windows Event Logs.
+import openai  # Imports the openai library for interacting with the GPT-3 API.
+#import threading  # Imports the threading library for managing threads.
+#from tqdm import tqdm  # Imports tqdm for creating loading bars in the GUI.
+#import subprocess  # Imports the subprocess module for running subprocesses.
+import sys
+
+print("Python Version:", sys.version)  # Prints the python version
+
+# Add the path to the spacy_transformers library (you may not need this if the library is installed in your virtual environment)
+sys.path.append("C:\\Users\\kroms\\.conda\\envs\\LLM_Test\\Lib\\site-packages\\spacy_transformers-1.2.5.dist-info")
+
+# Initialize NLTK
+nltk.download('punkt')
+
+# Load a pre-trained RoBERTa tokenizer
+tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+model = RobertaModel.from_pretrained('roberta-base')
+
+# Load a Transformers pipeline with RoBERTa
+nlp_transformers = TransformersLanguage(trf_name="roberta-base", meta={"lang": "en"})
+word_piecer = TransformersWordPiecer.from_pretrained("roberta-base")
+tok2vec = TransformersTok2Vec.from_pretrained("roberta-base")
+nlp_transformers.add_pipe(word_piecer, before="ner")
+nlp_transformers.add_pipe(tok2vec, before="ner")
+
+# Check TensorFlow version
+print("TensorFlow version:", tf.__version__)
+
+# Initialize a list to store visited URLs
+visited_urls = []
 
 
-#  Imports the necessary libraries
-import tkinter as tk  # imports the tkinter library, used to create the GUI
-from tkinter import filedialog  # this is a submodule from tkinter, used for file selection
-from tkinter import ttk  # import for themed widgets
-import Evtx.Evtx as evtx  # used to read windows event logs
-import spacy  # imports spaCy library, a natural language processing (NLP) library
-import openai  # imports the openai library which is used for interacting with the GPT-3 API
-import threading  # provides a way to create and manage threads
-from tqdm import tqdm  # adds in loading bar to enhance user experience
+# Web scraping function
+def scrape_web_data(url):
+    try:
+        # Send an HTTP GET request to the URL
+        response = requests.get(url)
 
-#  Sets the API key
-#  Replace the "ENTER KEY HERE" with your OpenAI key
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Parse the HTML content of the page
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Extract text from the web page
+            text = soup.get_text()
+
+            # Add the URL to the list of visited URLs
+            visited_urls.append(url)
+
+            # Find and follow links on this page
+            for link in soup.find_all('a'):
+                href = link.get('href')
+                if href and href.startswith(('http://', 'https://')):
+                    # Ensure that the link is an absolute URL
+                    next_url = href
+                else:
+                    # If the link is relative, make it absolute
+                    next_url = urljoin(url, href)
+
+                # Check if we have not visited the URL already
+                if next_url not in visited_urls:
+                    # Recursively scrape the next URL
+                    scrape_web_data(next_url)
+
+            # Return the text after scraping
+            return text
+
+    except Exception as e:
+        print("Error:", str(e))
+
+    # Return None in the case of an error
+    return None
+
+
+# Function to process text using RoBERTa-based LLM
+def process_with_llm(text):
+    doc = nlp_transformers(text)
+
+    # Access token-level information, excluding whitespace tokens
+    for token in doc:
+        if not token.is_space:
+            print("Text:", token.text)
+            print("Lemma:", token.lemma_)
+            print("Part of Speech:", token.pos_)
+            print("Tag:", token.tag_)
+
+
+# Function to analyze log entries in a similar format
+def analyze_log_entry(log_entry):
+    # Define a regular expression pattern to extract relevant information
+    pattern = r"Application '([^']+)' \(pid (\d+)\) cannot be restarted - Application SID does not match Conductor SID\."
+    match = re.match(pattern, log_entry)
+
+    if match:
+        application_path = match.group(1)
+        pid = match.group(2)
+
+        # Analyze or process the extracted information as needed
+        print("Application Path:", application_path)
+        print("PID:", pid)
+    else:
+        print("Log entry does not match the expected format:", log_entry)
+
+
+# Specify the starting URL
+start_url = "https://answers.microsoft.com/en-us/windows/forum/all/"  # Replace with the URL of the web page you want to scrape
+
+# Scrape and process web data
+scraped_text = scrape_web_data(start_url)
+
+# Use the scraped and processed data for training your LLM
+if scraped_text:
+    # Process the scraped text using the RoBERTa-based LLM
+    process_with_llm(scraped_text)
+else:
+    print("No data returned from web scraping.")
+
+# Analyze a sample Windows log entry (customize this for your log file)
+sample_log_entry = "Application 'C:\\Program Files\\WindowsApps\\MicrosoftWindows.Client.WebExperience_423.23500.0.0_x64__cw5n1h2txyewy\\Dashboard\\Widgets.exe' (pid 12436) cannot be restarted - Application SID does not match Conductor SID.."
+analyze_log_entry(sample_log_entry)
+
+# Sets the API key
+# Replace the "ENTER KEY HERE" with your OpenAI key
 openai.api_key = "PLACEHOLDER"
 
 # Sets the chat engine model to be used
@@ -29,6 +158,7 @@ nlp = spacy.load('en_core_web_sm')
 global log_files
 log_files = []
 
+
 # Function to analyze log files
 def analyze_logs(log_files, text_widget):
     # Enables the widget for writing
@@ -40,7 +170,7 @@ def analyze_logs(log_files, text_widget):
     # Iterate through each log file
     for file_path in log_files:
         # Opens the log file
-        with evtx.Evtx(file_path) as log:
+        with evtx.evtx(file_path) as log:
             for record in log.records():
                 log_contents = record.xml()
 
@@ -78,7 +208,7 @@ def send_query_and_display_response(log_files, log_contents, analysis_text, prog
                 # Send log_contents to ChatGPT for analysis
                 response = openai.Completion.create(
                     engine=model_engine,
-                    promt=log_contents,
+                    prompt=log_contents,
                     max_tokens=4096
                 )
                 response_text = response.choices[0].text
@@ -89,7 +219,7 @@ def send_query_and_display_response(log_files, log_contents, analysis_text, prog
                 analysis_text.see(tk.END)
 
                 # Update the progress bar
-                progess_bar.update(1)
+                progress_bar.update(1)
 
     #  Disable the "Analysis" text widget, making it read-only
     analysis_text.config(state='disabled')
@@ -122,8 +252,8 @@ def open_logs_and_interact_with_chatgpt(text_widget, progress_bar):
         send_query_and_display_response(log_files, log_contents_text, analysis_text, progress_bar)
 
         # Create a thread to process logs and interact with ChatGPT
-        #thread = threading.Thread(target=send_query_and_display_response, args=(log_files, text_widget, progress_bar))
-        #thread.start()
+        # thread = threading.Thread(target=send_query_and_display_response, args=(log_files, text_widget, progress_bar))
+        # thread.start()
     else:
         text_widget.insert(tk.END, "No log files selected. \n")
 
@@ -187,7 +317,8 @@ warning_label = tk.Label(tab1, text=warning_message, font=("Arial", 16, "bold"))
 warning_label.pack()
 
 # Creates a button to analyze logs and display the result in the "Analysis" tab
-analyze_button = tk.Button(tab3, text="Analyze Logs with ChatGPT", command=lambda: open_logs_and_interact_with_chatgpt(analysis_text, progress_bar))
+analyze_button = tk.Button(tab3, text="Analyze Logs with ChatGPT",
+                           command=lambda: open_logs_and_interact_with_chatgpt(analysis_text, progress_bar))
 analyze_button.pack()
 
 # Creates a progress bar for log analysis in the "Analysis" tab
