@@ -1,24 +1,42 @@
 #  This is a beta LLM for NLP, needs to be trained on a custom database THIS SECTION NEEDS TO BE UPDATED
-#  Time spent on this == 42 hours
+#  Time spent on this == 50 hours
 
-# Import the necessary libraries
-import nltk # Imports the nltk library for natural language processing tasks
+# Goals
+#  Display warning message and application version in tab1 (DONE)
+#  Display log content in tab2 without log analysis taking place (NEEDS TO BE DONE)
+#  Analyze logs and provide an explanation using NLP that is easy to understand
+#  Convert from a .py to a .exe using PyInstaller or something similar
+#  Expand ability to automatically parse and classify different log types beyond the current Windows and Apache formats
+#  Train machine learning models to categorize logs based on source, level, message format etc.
+#  Lookup tables to map log codes/IDs to human-readable descriptions
+#  Interactive charts showing trends in different log metrics over time
+#  Ability to filter logs by source, date, severity level via GUI controls
+#  Set notification rules based on log patterns indicating problems
+#  Real-time alerts for increases in particular error rates
+#  Email/SMS alerts when high priority issues detected, or some sort of alert system
+
+import nltk  # Imports the nltk library for natural language processing tasks
 import re  # Imports the re library for regular expressions.
 import tkinter as tk  # Imports the tkinter library for creating a graphical user interface (GUI).
 from tkinter import filedialog  # Imports the filedialog submodule from tkinter for file selection dialogs.
 from tkinter import ttk  # Imports the ttk submodule from tkinter for themed widgets.
 import sys  # Import the sys module for system-related operations
-import openai # Imports the openai library for interacting with the GPT-3 API. (WILL BE REMOVED IN FINAL RELEASE, FOR PROTOTYPE)
+import \
+    openai  # Imports the openai library for interacting with the GPT-3 API. (WILL BE REMOVED IN FINAL RELEASE, FOR PROTOTYPE)
 import evtx as evtx  # Imports the Evtx module from the Evtx library for working with Windows Event Logs.
 import requests  # Imports the requests library for making HTTP requests.
-from bs4 import BeautifulSoup # Import BeautifulSoup for HTML parsing
-from urllib.parse import urljoin # Import urljoin to construct absolute URLs by combining a base URL with a relative URL
+from bs4 import BeautifulSoup  # Import BeautifulSoup for HTML parsing
+from urllib.parse import \
+    urljoin  # Import urljoin to construct absolute URLs by combining a base URL with a relative URL
 import tkinter.font as tkFont  # Import the font module from tkinter
+import ctypes  # For interacting with Windows API, used for checking and requesting administrator privileges
+import os  # Provides a way of interacting with the operating system
 
 # Image path for the logo
 image_path = "C:/Users/kroms/Documents/SIP405_Logo.jpg"
 
-print("Python Version:", sys.version) # Prints the python version
+print("Python Version:", sys.version)  # Prints the python version
+print(dir(evtx))  # Prints evtx directory
 
 # Define NLTK specific downloads if not already downloaded
 nltk.download('punkt')
@@ -29,6 +47,23 @@ model_engine = "text-davinci-003"
 
 # Sets the log directory path
 LOG_DIRECTORY = "C:\Windows\System32\winevt\Logs"
+
+# Check if the script is running with administrator privileges
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
+# Request administrator privileges if not already running as administrator
+def run_as_admin():
+    if not is_admin():
+        #  Relaunch the script with administrator privileges using ShellExecuteW
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        sys.exit()
+
+# Run the script as administrator
+run_as_admin()
 
 # Function to process text using NLTK-based methods
 def process_with_nltk(text):
@@ -42,8 +77,10 @@ def process_with_nltk(text):
         print("Text:", token)
         print("Part of Speech:", tag)
 
+
 # List to keep track of visited URLs during web scraping
 visited_urls = []
+
 
 # Function to scrape web data (GOING TO BE CHANGED IN FUTURE RELEASES, PROOF OF CONCEPT FOR NOW)
 def scrape_web_data(url):
@@ -86,6 +123,7 @@ def scrape_web_data(url):
     # Return None in the case of an error
     return None
 
+
 # Function to analyze log entries in a similar format
 def analyze_log_entry(log_entry):
     # Define a regular expression pattern to extract relevant information
@@ -101,6 +139,7 @@ def analyze_log_entry(log_entry):
         print("PID:", pid)
     else:
         print("Log entry does not match the expected format:", log_entry)
+
 
 # The starting URL for web scraping
 start_url = "https://answers.microsoft.com/en-us/windows/forum/all/"
@@ -127,6 +166,7 @@ openai.api_key = "PLACEHOLDER"
 global log_files
 log_files = []
 
+
 # Function to analyze log files
 def analyze_logs(log_files, text_widget):
     # Enables the widget for writing
@@ -138,7 +178,7 @@ def analyze_logs(log_files, text_widget):
     # Iterate through each log file
     for file_path in log_files:
         # Opens the log file
-        with evtx.evtx(file_path) as log:
+        with evtx.PyEvtxParser(file_path) as log:
             for record in log.records():
                 log_contents = record.xml()
 
@@ -151,7 +191,14 @@ def analyze_logs(log_files, text_widget):
 
 
 # Function to process log files and interact with ChatGPT and display the log contents in tab2
-def send_query_and_display_response(log_files, log_contents_text, analysis_text, progress_bar):
+def send_query_and_display_response(log_files, log_contents_text, analysis_text, progress_bar, notebook):
+    #  Retrieve the log_contents_text_widget from the tab2 notebook
+    tab2 = notebook.nametowidget('!notebook.!frame2')  # Update with the correct tab index
+    log_contents_text = tab2.winfo_children()[0]
+
+    if log_contents_text is None:
+        print("Error: log_contents_text is None.")
+        return
     log_contents_text.config(state='normal')
     log_contents_text.delete(1.0, tk.END)
 
@@ -166,7 +213,7 @@ def send_query_and_display_response(log_files, log_contents_text, analysis_text,
             return
 
         for file_path in log_files:
-            with evtx.Evtx(file_path) as log:
+            with evtx.PyEvtxParser(file_path) as log:
                 for record in log.records():
                     log_contents = record.xml()
 
@@ -210,6 +257,7 @@ def display_log_contents_in_tab2(log_contents_text):
 
     log_contents_text.config(state='disabled')
 
+
 # Function to open log files and interact with ChatGPT using threading
 def open_logs_and_interact_with_chatgpt(text_widget, progress_bar, log_contents_text=None):
     global log_files
@@ -226,8 +274,12 @@ def open_logs_and_interact_with_chatgpt(text_widget, progress_bar, log_contents_
 
         # Calculate the total number of log records for progress bar
         for file_path in log_files:
-            with evtx.Evtx(file_path) as log:
+            log = evtx.PyEvtxParser(file_path)
+            try:
                 total_records += len(list(log.records()))
+            finally:
+                #  No need for log.close(), it's handled by the 'with' statement already
+                pass
 
         # Configure the progress bar
         progress_bar['maximum'] = total_records
@@ -241,6 +293,27 @@ def open_logs_and_interact_with_chatgpt(text_widget, progress_bar, log_contents_
         # thread.start()
     else:
         text_widget.insert(tk.END, "No log files selected. \n")
+
+
+def read_evtx_logs(file_path):
+    with evtx.PyEvtxParser(file_path) as log:
+        for record in log.records():
+            log_contents = record.xml()
+            #  Do something with log contents
+            print(log_contents)
+
+
+# Hook into GUI button to select log file (POSSIBLY CREATES ERROR HERE)
+def select_logs():
+    try:
+        file_path = filedialog.askopenfilename()
+        if file_path:
+            read_evtx_logs(file_path)
+    except PermissionError as e:
+        print(f"PermissionError: {e}. Check file permissions.")
+    except Exception as e:
+        print(f"Error: {e}")
+
 
 # Create the main GUI interface
 root = tk.Tk()
@@ -275,7 +348,14 @@ image_height = img.height()
 # Create a canvas inside the label and place the image in it
 canvas = tk.Canvas(tab1, width=img.width(), height=img.height())
 canvas.create_image(0, 0, anchor='nw', image=img)
-canvas.pack(side="bottom", anchor="se", padx=10, pady=10)  # Sticking to bottom right corner with padding
+canvas.pack(side="bottom", anchor="n", pady=(10, 125))  # Sticking to bottom right corner with padding
+
+# Use a Tkinter PhotoImage for the label's image
+tk_img = tk.PhotoImage(file=image_path)
+# Set the image on the canvas
+canvas.create_image(0, 0, anchor='nw', image=tk_img)
+# Make sure to keep a reference to the image
+canvas.image = tk_img
 
 # Second tab: Display log contents
 tab2 = ttk.Frame(notebook)
@@ -305,7 +385,7 @@ analysis_text.config(yscrollcommand=analysis_scrollbar.set)
 
 # Add the button to analyze logs in the "Analysis" tab (tab3)
 analyze_button = tk.Button(tab3, text="Analyze Logs with ChatGPT",
-                            command=lambda: open_logs_and_interact_with_chatgpt(analysis_text, progress_bar))
+                           command=lambda: open_logs_and_interact_with_chatgpt(analysis_text, progress_bar))
 analyze_button.pack()
 
 # Create a progress bar for log analysis in the "Analysis" tab
