@@ -169,31 +169,27 @@ log_files = []
 
 # Function to analyze log files
 def analyze_logs(log_files, text_widget):
-    # Enables the widget for writing
     text_widget.config(state='NORMAL')
-
-    # Deletes any pre-existing content
     text_widget.delete(1.0, tk.END)
 
-    # Iterate through each log file
-    for file_path in log_files:
-        # Opens the log file
-        with evtx.PyEvtxParser(file_path) as log:
-            for record in log.records():
-                log_contents = record.xml()
-
-                # Insert the log contents into the text widget
-                text_widget.insert(tk.END, log_contents)
-                text_widget.insert(tk.END, "\n")
-
-    # Disables the text widget, making it read-only
-    text_widget.config(state='disabled')
+    try:
+        for file_path in log_files:
+            with evtx.PyEvtxParser(file_path) as log:
+                for record in log.records():
+                    log_contents = record.xml()
+                    text_widget.insert(tk.END, log_contents)
+                    text_widget.insert(tk.END, "\n")
+    except Exception as e:
+        error_message = f"Error occurred: {str(e)}"
+        text_widget.insert(tk.END, f"Error: {error_message}\n")
+    finally:
+        text_widget.config(state='disabled')
 
 
 # Function to process log files and interact with ChatGPT and display the log contents in tab2
 def send_query_and_display_response(log_files, log_contents_text, analysis_text, progress_bar, notebook):
     #  Retrieve the log_contents_text_widget from the tab2 notebook
-    tab2 = notebook.nametowidget('!notebook.!frame2')  # Update with the correct tab index
+    tab2 = notebook.nametowidget(notebook.winfo_children()[1])  # Update with the correct tab index
     log_contents_text = tab2.winfo_children()[0]
 
     if log_contents_text is None:
@@ -286,7 +282,7 @@ def open_logs_and_interact_with_chatgpt(text_widget, progress_bar, log_contents_
         progress_bar['value'] = 0  # Initialize progress to 0
 
         #  Call the send_query_and_display_response function with log_files
-        send_query_and_display_response(log_files, log_contents_text, analysis_text, progress_bar)
+        send_query_and_display_response(log_files, log_contents_text, analysis_text, progress_bar, notebook)
 
         # Create a thread to process logs and interact with ChatGPT
         # thread = threading.Thread(target=send_query_and_display_response, args=(log_files, text_widget, progress_bar))
